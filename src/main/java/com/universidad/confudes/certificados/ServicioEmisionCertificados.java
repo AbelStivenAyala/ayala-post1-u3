@@ -1,9 +1,7 @@
 package com.universidad.confudes.certificados;
 
-import org.springframework.stereotype.Service;
 
-@Service
-public class ServicioEmisionCertificados {
+public class ServicioEmisionCertificados implements ServicioCertificados {
 
     private static final double PORCENTAJE_ASISTENCIA_MINIMA = 0.8;
     private static final String PLANTILLA = "plantilla-2026";
@@ -22,22 +20,25 @@ public class ServicioEmisionCertificados {
         this.correo = correo;
     }
 
-    public String emitir(String eventoId, String participanteId, String nombre, String correoDestino) {
-        if (!validador.tieneAsistenciaMinima(participanteId, eventoId, PORCENTAJE_ASISTENCIA_MINIMA)) {
+    @Override
+    public byte[] emitir(SolicitudCertificado solicitud) {
+        if (!validador.tieneAsistenciaMinima(solicitud.getParticipanteId(), solicitud.getEventoId(),
+                PORCENTAJE_ASISTENCIA_MINIMA)) {
             throw new AsistenciaInsuficienteException("Asistencia insuficiente");
         }
 
         byte[] doc = generador.iniciarDocumento(PLANTILLA);
-        generador.insertarDatosParticipante(doc, nombre, eventoId, "2026-08-06");
+        generador.insertarDatosParticipante(doc, solicitud.getNombre(), solicitud.getEventoId(), "2026-08-06");
         byte[] documentoFinal = generador.finalizarDocumento();
 
         FirmaDigitalService.Sesion sesion = firma.abrirSesion(CERTIFICADO_INSTITUCIONAL);
         byte[] documentoFirmado = firma.firmar(sesion, documentoFinal);
         firma.cerrarSesion(sesion);
 
-        correo.adjuntarArchivo(correoDestino, documentoFirmado, "certificado-" + participanteId + ".pdf");
-        correo.enviar("Su certificado de participación", "Adjunto encontrará su certificado.");
+        correo.adjuntarArchivo(solicitud.getCorreoDestino(), documentoFirmado,
+                "certificado-" + solicitud.getParticipanteId() + ".pdf");
+        correo.enviar("Su certificado de participacion", "Adjunto encontrara su certificado.");
 
-        return "Certificado emitido y enviado";
+        return documentoFirmado;
     }
 }
